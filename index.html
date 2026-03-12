@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DogVital — Canine Health Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Clash+Display:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg:       #04080f;
+  --surface:  #080f1a;
+  --card:     #0b1420;
+  --border:   #112030;
+  --g:        #00f5a0;
+  --c:        #00d4ff;
+  --r:        #ff3d6b;
+  --a:        #ffaa00;
+  --p:        #a855f7;
+  --text:     #b8cdd8;
+  --dim:      #2a4050;
+  --white:    #e8f4ff;
+  --mono:     'DM Mono', monospace;
+  --display:  'Clash Display', sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+}
+
+/* Animated background */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 20%, rgba(0,245,160,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 80% 80%, rgba(0,212,255,0.04) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 20px 24px 40px;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 0 22px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-icon {
+  width: 46px; height: 46px;
+  background: linear-gradient(135deg, var(--g), var(--c));
+  border-radius: 12px;
+  display: grid; place-items: center;
+  font-size: 24px;
+}
+
+.brand-name {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: -1px;
+}
+
+.brand-sub {
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.conn-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--dim);
+  transition: all 0.4s;
+}
+
+.conn-pill.live {
+  border-color: rgba(0,245,160,0.3);
+  color: var(--g);
+}
+
+.conn-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+
+.conn-pill.live .conn-dot {
+  background: var(--g);
+  box-shadow: 0 0 0 3px rgba(0,245,160,0.2);
+  animation: blink 2s infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── STAT CARDS ── */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.scard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 20px 18px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, border-color 0.3s;
+}
+
+.scard:hover { transform: translateY(-2px); }
+
+.scard::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent, var(--c));
+  border-radius: 14px 14px 0 0;
+}
+
+.scard-emoji {
+  position: absolute;
+  top: 18px; right: 16px;
+  font-size: 28px;
+  opacity: 0.12;
+}
+
+.scard-label {
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 12px;
+}
+
+.scard-value {
+  font-family: var(--display);
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--white);
+  line-height: 1;
+  margin-bottom: 8px;
+  transition: color 0.3s;
+}
+
+.scard-sub {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.scard-min {
+  margin-top: 12px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.scard-min-val {
+  color: var(--white);
+  font-weight: 500;
+}
+
+/* ── GRAPHS ── */
+.graphs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.gcard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.gcard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.gcard-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.live-tag {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(0,245,160,0.08);
+  border: 1px solid rgba(0,245,160,0.18);
+  color: var(--g);
+}
+
+canvas {
+  display: block;
+  width: 100% !important;
+  height: 175px !important;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.2);
+}
+
+/* ── BOTTOM ── */
+.bottom {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 14px;
+}
+
+.bcard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.bcard-label {
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 14px;
+}
+
+/* GPS */
+.gps-box {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 12px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+}
+
+.gps-box a { color: var(--c); text-decoration: none; word-break: break-all; }
+.gps-box a:hover { text-decoration: underline; }
+.gps-nofix { color: var(--dim); }
+
+/* History table */
+.htable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.htable th {
+  text-align: left;
+  padding: 6px 12px;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  border-bottom: 1px solid var(--border);
+}
+
+.htable td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(17,32,48,0.6);
+  transition: background 0.2s;
+}
+
+.htable tr:last-child td { border-bottom: none; }
+.htable tbody tr:hover td { background: rgba(255,255,255,0.02); }
+
+.no-history {
+  text-align: center;
+  color: var(--dim);
+  padding: 24px 0;
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+  .stats  { grid-template-columns: repeat(2,1fr); }
+  .graphs { grid-template-columns: 1fr; }
+  .bottom { grid-template-columns: 1fr; }
+}
+
+/* Number update flash */
+@keyframes flash {
+  0%   { color: var(--g); }
+  100% { color: var(--white); }
+}
+.flash { animation: flash 0.4s ease-out; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🐾</div>
+      <div>
+        <div class="brand-name">DogVital</div>
+        <div class="brand-sub">Canine Health Telemetry</div>
+      </div>
+    </div>
+    <div class="conn-pill" id="connPill">
+      <div class="conn-dot"></div>
+      <span id="connLabel">Waiting for device...</span>
+    </div>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="scard" style="--accent:var(--g)">
+      <div class="scard-emoji">🐾</div>
+      <div class="scard-label">Total Steps</div>
+      <div class="scard-value" id="stepVal">0</div>
+      <div class="scard-sub">steps detected</div>
+    </div>
+
+    <div class="scard" style="--accent:var(--c)">
+      <div class="scard-emoji">🫁</div>
+      <div class="scard-label">Breath Valleys</div>
+      <div class="scard-value" id="valleyVal">0</div>
+      <div class="scard-sub">total detected</div>
+      <div class="scard-min">
+        <span>This minute</span>
+        <span class="scard-min-val" id="minValley">0</span>
+      </div>
+    </div>
+
+    <div class="scard" style="--accent:var(--r)">
+      <div class="scard-emoji">❤️</div>
+      <div class="scard-label">Heart Beats</div>
+      <div class="scard-value" id="beatVal">0</div>
+      <div class="scard-sub">this minute</div>
+      <div class="scard-min">
+        <span>Est. BPM</span>
+        <span class="scard-min-val" id="bpmVal">--</span>
+      </div>
+    </div>
+
+    <div class="scard" style="--accent:var(--a)">
+      <div class="scard-emoji">📍</div>
+      <div class="scard-label">GPS</div>
+      <div class="scard-value" style="font-size:20px; padding-top:8px" id="gpsStatVal">No Fix</div>
+      <div class="scard-sub" id="gpsSub">searching satellites</div>
+    </div>
+  </div>
+
+  <!-- Graphs -->
+  <div class="graphs">
+    <div class="gcard">
+      <div class="gcard-header">
+        <div class="gcard-title">🫁 &nbsp;Stretch · Breathing</div>
+        <div class="live-tag">LIVE</div>
+      </div>
+      <canvas id="stretchCanvas"></canvas>
+    </div>
+    <div class="gcard">
+      <div class="gcard-header">
+        <div class="gcard-title">❤️ &nbsp;PPG · Heart Rate</div>
+        <div class="live-tag">LIVE</div>
+      </div>
+      <canvas id="ppgCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Bottom -->
+  <div class="bottom">
+    <div class="bcard">
+      <div class="bcard-label">📍 GPS Location</div>
+      <div class="gps-box" id="gpsBox">
+        <span class="gps-nofix">Waiting for GPS fix…</span>
+      </div>
+    </div>
+
+    <div class="bcard">
+      <div class="bcard-label">📋 Per-Minute History</div>
+      <table class="htable">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>🫁 Valleys</th>
+            <th>❤️ Beats</th>
+            <th>🐾 Steps</th>
+          </tr>
+        </thead>
+        <tbody id="histBody">
+          <tr><td colspan="4" class="no-history">History logs every minute — waiting…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Canvas setup ──────────────────────────────
+function initCanvas(id) {
+  const el = document.getElementById(id);
+  const dpr = window.devicePixelRatio || 1;
+  const w = el.parentElement.clientWidth - 40;
+  const h = 175;
+  el.style.width  = w + 'px';
+  el.style.height = h + 'px';
+  el.width  = w * dpr;
+  el.height = h * dpr;
+  const ctx = el.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx, w, h };
+}
+
+let SC, PC;
+function setupCanvases() {
+  SC = initCanvas('stretchCanvas');
+  PC = initCanvas('ppgCanvas');
+}
+
+// ── Draw ──────────────────────────────────────
+function draw(C, data, markers, lineColor, markerColor) {
+  const { ctx, w, h } = C;
+  ctx.clearRect(0, 0, w, h);
+
+  // bg
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(0, 0, w, h);
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 5; i++) {
+    const y = h * i / 5;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+  for (let i = 1; i < 10; i++) {
+    const x = w * i / 10;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+  }
+
+  if (!data || data.length < 2) {
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.font = '12px DM Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waiting for data...', w/2, h/2);
+    return;
+  }
+
+  const mn = Math.min(...data);
+  const mx = Math.max(...data);
+  const range = (mx - mn) || 1;
+  const pad = 10;
+  const xStep = (w) / (data.length - 1);
+
+  const toY = v => h - pad - ((v - mn) / range) * (h - pad*2);
+
+  // fill
+  ctx.beginPath();
+  data.forEach((v,i) => i===0 ? ctx.moveTo(0, toY(v)) : ctx.lineTo(i*xStep, toY(v)));
+  ctx.lineTo((data.length-1)*xStep, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0,0,0,h);
+  // parse color for alpha version
+  grad.addColorStop(0, lineColor.replace('rgb(','rgba(').replace(')',',0.18)'));
+  grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // glow line
+  ctx.save();
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = lineColor;
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  data.forEach((v,i) => i===0 ? ctx.moveTo(0, toY(v)) : ctx.lineTo(i*xStep, toY(v)));
+  ctx.stroke();
+  ctx.restore();
+
+  // markers
+  if (markers && markers.length) {
+    markers.forEach(pi => {
+      if (pi >= data.length) return;
+      const x = pi * xStep;
+      const y = toY(data[pi]);
+      ctx.save();
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = markerColor;
+      ctx.fillStyle = markerColor;
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+}
+
+// ── Stat update with flash ────────────────────
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el.textContent !== String(val)) {
+    el.textContent = val;
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+  }
+}
+
+// ── GPS ───────────────────────────────────────
+function updateGPS(raw) {
+  const box    = document.getElementById('gpsBox');
+  const stat   = document.getElementById('gpsStatVal');
+  const sub    = document.getElementById('gpsSub');
+
+  if (!raw || raw.includes('No Fix')) {
+    stat.textContent = 'No Fix';
+    sub.textContent  = 'searching satellites';
+    box.innerHTML    = '<span class="gps-nofix">GPS: No Fix — searching…</span>';
+  } else {
+    const url = raw.replace('GPS:', '');
+    stat.textContent = 'Fixed ✓';
+    sub.textContent  = 'tap to open map';
+    box.innerHTML    = `<a href="${url}" target="_blank">📍 ${url}</a>`;
+  }
+}
+
+// ── History ───────────────────────────────────
+function updateHistory(hist) {
+  if (!hist || !hist.length) return;
+  const tbody = document.getElementById('histBody');
+  tbody.innerHTML = [...hist].reverse().map(h => `
+    <tr>
+      <td style="color:var(--dim)">${h.time}</td>
+      <td style="color:var(--c)">${h.valleys}</td>
+      <td style="color:var(--r)">${h.beats}</td>
+      <td style="color:var(--g)">${h.steps}</td>
+    </tr>`).join('');
+}
+
+// ── BPM estimate ──────────────────────────────
+let lastBeatCount = 0, lastBeatTs = Date.now();
+
+function updateBPM(beats) {
+  if (beats !== lastBeatCount) {
+    const secs = (Date.now() - lastBeatTs) / 1000;
+    if (secs > 0) {
+      const bpm = Math.round((beats / secs) * 60);
+      document.getElementById('bpmVal').textContent = (bpm > 0 && bpm < 300) ? bpm : '--';
+    }
+    lastBeatCount = beats;
+    lastBeatTs = Date.now();
+  }
+}
+
+// ── WebSocket ─────────────────────────────────
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/ws`);
+  const pill = document.getElementById('connPill');
+  const label = document.getElementById('connLabel');
+
+  ws.onopen = () => {
+    pill.classList.add('live');
+    label.textContent = 'Device connected';
+  };
+
+  ws.onclose = () => {
+    pill.classList.remove('live');
+    label.textContent = 'Reconnecting…';
+    setTimeout(connect, 2500);
+  };
+
+  ws.onmessage = ({ data }) => {
+    let d;
+    try { d = JSON.parse(data); } catch { return; }
+
+    if (d.type === 'ping') return;
+
+    if (d.type === 'gps') { updateGPS(d.value); return; }
+
+    if (d.type !== 'data') return;
+
+    setVal('stepVal',   d.step_count   ?? 0);
+    setVal('valleyVal', d.valley_count ?? 0);
+    setVal('minValley', d.minute_valley_count ?? 0);
+    setVal('beatVal',   d.minute_beat_count ?? 0);
+    updateBPM(d.minute_beat_count ?? 0);
+
+    if (d.gps) updateGPS(d.gps);
+
+    if (d.stretch_filtered?.length > 1)
+      draw(SC, d.stretch_filtered, d.stretch_valleys, 'rgb(0,245,160)', '#ff3d6b');
+
+    if (d.ppg_centered?.length > 1)
+      draw(PC, d.ppg_centered, d.ppg_peaks, 'rgb(168,85,247)', '#ffaa00');
+
+    if (d.history?.length) updateHistory(d.history);
+  };
+}
+
+// ── Init ──────────────────────────────────────
+window.addEventListener('load', () => {
+  setupCanvases();
+  connect();
+});
+
+window.addEventListener('resize', setupCanvases);
+</script>
+</body>
+</html>
