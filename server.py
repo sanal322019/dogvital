@@ -16,7 +16,7 @@ STEP_NEG_THRESHOLD = -0.25
 STEP_POS_THRESHOLD = 0.24
 
 CUTOFF_FREQ = 2.0
-SAMPLING_RATE = 20
+SAMPLING_RATE = 100   # FIXED (matches ESP sampling rate)
 SG_WINDOW = 11
 SG_POLYORDER = 2
 SAMPLE_TOLERANCE = 5
@@ -69,13 +69,16 @@ class ConnectionManager:
             self.active.remove(ws)
 
     async def broadcast(self, data: dict):
-        msg = json.dumps(data)
+        # FIX: allow numpy numbers to be converted automatically
+        msg = json.dumps(data, default=float)
+
         dead = []
         for ws in self.active:
             try:
                 await ws.send_text(msg)
             except:
                 dead.append(ws)
+
         for ws in dead:
             self.disconnect(ws)
 
@@ -98,35 +101,42 @@ async def get():
 async def health():
     return {"status": "ok"}
 
-# ESP32 connects here
+# ================= ESP ENDPOINT =================
 @app.websocket("/esp")
 async def esp_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("ESP32 connected")
+
     try:
         async for message in websocket.iter_text():
             await process_line(message.strip())
+
     except WebSocketDisconnect:
         print("ESP32 disconnected")
+
     except Exception as e:
         print(f"ESP32 error: {e}")
 
-# Browser connects here
+# ================= BROWSER ENDPOINT =================
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     print("Browser connected")
+
     try:
         if state.latest_payload:
-            await websocket.send_text(json.dumps(state.latest_payload))
+            await websocket.send_text(json.dumps(state.latest_payload, default=float))
+
         while True:
             try:
                 await asyncio.wait_for(websocket.receive_text(), timeout=30)
             except asyncio.TimeoutError:
                 await websocket.send_text(json.dumps({"type": "ping"}))
+
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-    except Exception as e:
+
+    except Exception:
         manager.disconnect(websocket)
 
 # ================= PROCESS LINE =================
@@ -135,7 +145,6 @@ async def process_line(line: str):
 
     if line.startswith("GPS:"):
         s.gps_link = line
-        print(line)
         await manager.broadcast({"type": "gps", "value": line})
         return
 
@@ -150,6 +159,7 @@ async def process_line(line: str):
     except:
         return
 
+    # STEP DETECTION
     if s.step_state == 0:
         if roll <= STEP_NEG_THRESHOLD:
             s.step_state = 1
@@ -164,20 +174,22 @@ async def process_line(line: str):
 
     payload = {
         "type": "data",
-        "step_count": s.step_count,
-        "valley_count": s.valley_count,
-        "minute_valley_count": s.minute_valley_count,
-        "minute_beat_count": s.minute_beat_count,
+        "step_count": int(s.step_count),
+        "valley_count": int(s.valley_count),
+        "minute_valley_count": int(s.minute_valley_count),
+        "minute_beat_count": int(s.minute_beat_count),
         "gps": s.gps_link,
         "stretch_raw": [],
         "stretch_filtered": [],
         "stretch_valleys": [],
         "ppg_centered": [],
         "ppg_peaks": [],
-        "history": s.history[-20:],
+        "history": s.history[-20:]
     }
 
+    # ================= BREATHING =================
     if len(s.stretch_data) >= SG_WINDOW:
+
         raw = np.array(s.stretch_data)
         lpf = lowpass_filter(raw)
         filtered = savgol_filter(lpf, SG_WINDOW, SG_POLYORDER)
@@ -187,12 +199,13 @@ async def process_line(line: str):
         crests, _ = find_peaks(filtered, distance=40, prominence=20)
 
         valid_valleys = []
+
         for v in valleys:
             left = [c for c in crests if c < v]
             if left:
                 depth = filtered[max(left)] - filtered[v]
                 if depth >= 70:
-                    valid_valleys.append(v)
+                    valid_valleys.append(int(v))
 
         abs_indices = [
             s.sample_count - (MAX_POINTS - 1 - v)
@@ -213,7 +226,9 @@ async def process_line(line: str):
         payload["stretch_filtered"] = filtered.tolist()
         payload["stretch_valleys"] = valid_valleys
 
+    # ================= HEART RATE =================
     if len(s.ppg_data) >= SG_WINDOW:
+
         ppg_arr = np.array(s.ppg_data)
         ppg_f = savgol_filter(ppg_arr, 11, 2)
         centered = ppg_f - np.mean(ppg_f)
@@ -222,31 +237,32 @@ async def process_line(line: str):
 
         for p in peaks:
             abs_peak = s.sample_count - (MAX_POINTS - 1 - p)
+
             if abs_peak - s.last_detected_peak > 30:
                 s.last_detected_peak = abs_peak
                 s.minute_beat_count += 1
 
         payload["ppg_centered"] = centered.tolist()
-        payload["ppg_peaks"] = peaks.tolist()
+        payload["ppg_peaks"] = [int(p) for p in peaks]
 
+    # ================= MINUTE HISTORY =================
     now = time.time()
+
     if now - s.minute_valley_start >= 60:
+
         s.history.append({
             "time": time.strftime("%H:%M"),
-            "valleys": s.minute_valley_count,
-            "beats": s.minute_beat_count,
-            "steps": s.step_count - s.history_step_start,
+            "valleys": int(s.minute_valley_count),
+            "beats": int(s.minute_beat_count),
+            "steps": int(s.step_count - s.history_step_start)
         })
+
         s.history_step_start = s.step_count
         s.minute_valley_count = 0
         s.minute_beat_count = 0
         s.minute_valley_start = now
-        payload["history"] = s.history[-20:]
 
-    payload["valley_count"] = s.valley_count
-    payload["minute_valley_count"] = s.minute_valley_count
-    payload["minute_beat_count"] = s.minute_beat_count
-    payload["step_count"] = s.step_count
+        payload["history"] = s.history[-20:]
 
     s.latest_payload = payload
     await manager.broadcast(payload)
